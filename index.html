@@ -39,7 +39,7 @@ function vibrate(){if(navigator.vibrate) navigator.vibrate([8,12,5]);}
 function point(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
 function makeCrack(x,y){
  const count=Math.floor(rand(13,19)), base=rand(0,Math.PI*2), id=cracks.length;
- const crack={x,y,lines:[],born:performance.now(),duration:rand(230,390)};
+ const crack={x,y,lines:[],born:performance.now(),duration:rand(65,120)};
  for(let i=0;i<count;i++){
   const a=base+i*Math.PI*2/count+rand(-.13,.13), max= Math.hypot(Math.max(x,w-x),Math.max(y,h-y))*1.15;
   const len=max*rand(.48,1.02), steps=Math.max(5,Math.floor(len/42)), pts=[{x,y}];
@@ -51,12 +51,12 @@ function makeCrack(x,y){
    pts.push({x:px,y:py});
    if(px<0||px>w||py<0||py>h)break;
   }
-  crack.lines.push({pts,delay:rand(0,95),width:rand(.65,1.45),main:true});
+  crack.lines.push({pts,delay:rand(0,24),width:rand(.65,1.45),main:true});
   if(Math.random()<.82){
    const k=Math.floor(rand(1,Math.max(2,pts.length-2))), p=pts[k], side=Math.random()<.5?-1:1;
    const ba=a+side*rand(.35,.85), bl=rand(45,Math.min(160,Math.max(55,len*.22))), bp=[{x:p.x,y:p.y}];
    for(let q=1;q<=3;q++)bp.push({x:p.x+Math.cos(ba)*bl*q/3+rand(-3,3),y:p.y+Math.sin(ba)*bl*q/3+rand(-3,3)});
-   crack.lines.push({pts:bp,delay:rand(30,160),width:rand(.35,.8),main:false});
+   crack.lines.push({pts:bp,delay:rand(8,42),width:rand(.35,.8),main:false});
   }
  }
  cracks.push(crack);
@@ -110,7 +110,7 @@ function animate(t){const dt=Math.min(32,t-lastTime||16);lastTime=t;
  for(const p of particles){p.x+=p.vx*dt*.04;p.y+=p.vy*dt*.04;p.life-=dt/550;}
  particles=particles.filter(p=>p.life>0);
  draw(t);
- const animating=cracks.some(c=>t-c.born<c.duration+180);
+ const animating=cracks.some(c=>t-c.born<c.duration+70);
  if(animating||moving||particles.length)requestAnimationFrame(animate);
 }
 function startAnimation(){lastTime=performance.now();requestAnimationFrame(animate);}
