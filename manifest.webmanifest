@@ -1,9 +1,8 @@
 {
-  "name": "FRACTURE — glass touch",
+  "name": "FRACTURE — Glass Touch",
   "short_name": "FRACTURE",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#111214",
-  "theme_color": "#111214",
-  "icons": []
+  "background_color": "#101216",
+  "theme_color": "#101216"
 }
