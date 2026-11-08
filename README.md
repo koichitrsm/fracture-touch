@@ -1,10 +1,10 @@
-[README.md](https://github.com/user-attachments/files/34539777/README.md)
-# FRACTURE — Glass Touch (Ver.2)
+# FRACTURE — Glass Touch (Ver.2.1)
 
 スマートフォン／PCブラウザで動作する、ガラスのひび割れ表現アプリです。
 
 ## Ver.2の追加機能
 - ヒビの周囲に白い反射・グローを描画
+- Ver.2.1：ヒビの伸びる速度を高速化（約0.07〜0.12秒で進行）
 - 三角形・多角形の半透明なガラス片を表示
 - タップ時に対応端末で微細な振動（Vibration API）
 - 亀裂を画面端方向まで伸ばす演出
