@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#111214">
+<meta name="description" content="画面をタップすると、ガラスにひびが広がるインタラクティブアプリ。">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>FRACTURE — glass touch</title>
+<style>
+  :root { color-scheme:dark; --bg:#111214; --fg:#e8e8e5; --muted:#777b80; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; width:100%; height:100%; overflow:hidden; background:var(--bg); }
+  body {
+    color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    touch-action:manipulation; user-select:none; -webkit-user-select:none; overscroll-behavior:none;
+  }
+  #app { position:fixed; inset:0; overflow:hidden; background:
+    radial-gradient(ellipse at 50% 45%, #202328 0%, #15171a 45%, #101113 100%); }
+  canvas { position:absolute; inset:0; width:100%; height:100%; touch-action:pan-y; }
+  .top { position:absolute; z-index:2; top:max(25px,env(safe-area-inset-top)); left:0; right:0; text-align:center; pointer-events:none; }
+  .logo { font-size:10px; font-weight:600; letter-spacing:.42em; color:#d7d9dc; }
+  .hint { margin-top:11px; font-size:12px; letter-spacing:.08em; color:#777d85; }
+  .bottom { position:absolute; z-index:2; left:0; right:0; bottom:max(25px,env(safe-area-inset-bottom)); display:flex; align-items:center; justify-content:center; gap:18px; }
+  .counter { color:#747a82; font-size:10px; letter-spacing:.14em; font-variant-numeric:tabular-nums; }
+  button { pointer-events:auto; border:1px solid #41454b; background:rgba(20,22,25,.72); color:#c9cdd1; border-radius:99px; padding:10px 17px; font-size:11px; letter-spacing:.12em; }
+  button:active { background:#30343a; }
+  .flash { position:absolute; inset:0; pointer-events:none; background:#fff; opacity:0; }
+  @media (prefers-reduced-motion: reduce) { .flash { display:none; } }
+</style>
+</head>
+<body>
+<main id="app">
+  <canvas id="glass" aria-label="画面をタップしてガラスのひびを作成"></canvas>
+  <div class="flash" id="flash"></div>
+  <header class="top">
+    <div class="logo">F R A C T U R E</div>
+    <div class="hint">画面をタップして、ひびを広げる</div>
+  </header>
+  <footer class="bottom">
+    <span class="counter" id="count">0 IMPACTS</span>
+    <button id="reset" type="button">RESET</button>
+  </footer>
+</main>
+<script>
+(() => {
+  const canvas = document.getElementById('glass');
+  const ctx = canvas.getContext('2d');
+  const countEl = document.getElementById('count');
+  const flash = document.getElementById('flash');
+  let width=0,height=0,dpr=1, cracks=[], impacts=0, anim=0, lastTap=0;
+
+  const rand=(a,b)=>a+Math.random()*(b-a);
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+  function resize(){
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    width=innerWidth; height=innerHeight;
+    canvas.width=Math.round(width*dpr); canvas.height=Math.round(height*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    render(performance.now());
+  }
+  addEventListener('resize',resize,{passive:true});
+
+  // Build a Voronoi-like fracture: straight radial spokes with branching polygonal cracks.
+  function createFracture(x,y){
+    const now=performance.now();
+    const maxR=Math.hypot(Math.max(x,width-x),Math.max(y,height-y))+40;
+    const rays=Math.floor(rand(11,18));
+    const baseAngle=rand(0,Math.PI*2);
+    const newLines=[];
+    for(let r=0;r<rays;r++){
+      const angle=baseAngle+(Math.PI*2*r/rays)+rand(-.12,.12);
+      const reach=maxR*rand(.72,1.03);
+      const steps=Math.floor(rand(4,8));
+      let px=x,py=y;
+      const line=[];
+      for(let s=1;s<=steps;s++){
+        const t=s/steps;
+        const bend=(s===steps?0:rand(-10,10));
+        const distance=reach/steps;
+        const a=angle+bend*.004;
+        px+=Math.cos(a)*distance;
+        py+=Math.sin(a)*distance;
+        line.push({x:px,y:py});
+      }
+      newLines.push({origin:{x,y},points:line, born:now, delay:rand(0,.09), type:'main'});
+      // Small secondary branches split away from selected main cracks.
+      if(Math.random()<.72){
+        const index=Math.floor(rand(1,Math.max(2,line.length-1)));
+        const from=index===0?{x,y}:line[index-1];
+        const branchAngle=angle+rand(-1.05,1.05);
+        const branchLength=rand(24,Math.min(105,maxR*.22));
+        const branchSteps=Math.floor(rand(2,5));
+        const pts=[]; let bx=from.x,by=from.y;
+        for(let k=1;k<=branchSteps;k++){
+          const a=branchAngle+rand(-.08,.08);
+          bx+=Math.cos(a)*branchLength/branchSteps;
+          by+=Math.sin(a)*branchLength/branchSteps;
+          pts.push({x:bx,y:by});
+        }
+        newLines.push({origin:from,points:pts,born:now,delay:rand(.04,.18),type:'branch'});
+      }
+    }
+    cracks.push(...newLines);
+    impacts++;
+    countEl.textContent=impacts+' IMPACT'+(impacts===1?'':'S');
+    flash.animate([{opacity:.12},{opacity:0}],{duration:170,easing:'ease-out'});
+    if(!anim) anim=requestAnimationFrame(loop);
+  }
+
+  function drawPolyline(points, progress, alpha, lineWidth){
+    if(points.length<1) return;
+    const total=points.length;
+    const scaled=clamp(progress,0,1)*total;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x,points[0].y);
+    for(let i=1;i<points.length;i++){
+      if(i<=scaled) ctx.lineTo(points[i].x,points[i].y);
+      else {
+        const frac=scaled-(i-1);
+        if(frac>0){
+          const a=points[i-1],b=points[i];
+          ctx.lineTo(a.x+(b.x-a.x)*frac,a.y+(b.y-a.y)*frac);
+        }
+        break;
+      }
+    }
+    ctx.strokeStyle=`rgba(235,242,248,${alpha})`;
+    ctx.lineWidth=lineWidth;
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.stroke();
+  }
+
+  function render(now){
+    ctx.clearRect(0,0,width,height);
+    // Subtle glass-like ambient sheen.
+    const sheen=ctx.createLinearGradient(0,0,width,height);
+    sheen.addColorStop(0,'rgba(255,255,255,.018)');
+    sheen.addColorStop(.5,'rgba(255,255,255,0)');
+    sheen.addColorStop(1,'rgba(160,190,220,.025)');
+    ctx.fillStyle=sheen; ctx.fillRect(0,0,width,height);
+
+    for(const crack of cracks){
+      const age=(now-crack.born)/1000-crack.delay;
+      const reveal=clamp(age/.22,0,1);
+      const main=crack.type==='main';
+      // Fine bright edge plus a faint darker shadow gives the fracture a glass-cut look.
+      ctx.save();
+      ctx.shadowColor='rgba(220,235,248,.28)';
+      ctx.shadowBlur=main?4:2;
+      drawPolyline(crack.points,reveal,main?.82:.48,main?1.15:.7);
+      ctx.restore();
+      drawPolyline(crack.points,reveal,main?.22:.13,main?2.8:2.0);
+    }
+  }
+
+  function loop(now){
+    render(now);
+    const pending=cracks.some(c=>(now-c.born)/1000-c.delay<.24);
+    if(pending) anim=requestAnimationFrame(loop); else anim=0;
+  }
+
+  canvas.addEventListener('pointerdown',e=>{
+    if(e.pointerType==='mouse' && e.button!==0) return;
+    e.preventDefault();
+    createFracture(e.clientX,e.clientY);
+  },{passive:false});
+
+  document.getElementById('reset').addEventListener('click',()=>{
+    cracks=[]; impacts=0; countEl.textContent='0 IMPACTS';
+    if(anim) cancelAnimationFrame(anim);
+    anim=0; render(performance.now());
+  });
+  resize();
+})();
+</script>
+</body>
+</html>
